@@ -1,0 +1,67 @@
+//============================================================================
+// Name        : ChessClient.cpp
+// Author      : Neculau Francisc
+// Version     : 1.0.0
+// Copyright   : Your copyright notice
+// Description : Hello World in C++, Ansi-style
+//============================================================================
+
+#include <iostream>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/time.h>
+#include <netinet/in.h>
+#include <unistd.h>
+#include <errno.h>
+#include <stdio.h>
+#include <arpa/inet.h>
+#include <string.h>
+#include <pthread.h>
+
+using namespace std;
+
+int readConsoleLine(char *, char *);
+
+static const int PORT = 2728;
+
+int main() {
+
+	int serverSocketDescriptor;
+	if((serverSocketDescriptor = socket(AF_INET, SOCK_STREAM, 0)) == -1)
+		cout<<"error";
+
+	struct sockaddr_in serverSocketAddress;
+	serverSocketAddress.sin_family      = AF_INET;
+	serverSocketAddress.sin_addr.s_addr = inet_addr("127.0.0.1");
+	serverSocketAddress.sin_port        = htons(PORT);
+
+	if(connect(serverSocketDescriptor, (struct sockaddr *) &serverSocketAddress, sizeof(struct sockaddr)) == -1)
+		cout << "error";
+
+	/*
+	 * Aici clientul incepe comunicarea cu serverul
+	 * *** *** *** START ***
+	 */
+	char message[256];
+	int messageLength;
+	messageLength = readConsoleLine("--message--", message);
+	if(send(serverSocketDescriptor, &message, sizeof(message), 0) < 0)
+		cout << "error";
+	/*
+	 * *** *** *** END ***
+	 */
+
+	close(serverSocketDescriptor);
+
+	cout << "***END Client***" << endl;
+	return 0;
+}
+
+int readConsoleLine(char * prefix, char * buffer) {
+	printf("@%s: ", prefix);
+	fgets(buffer, 256, stdin);
+	/* remove newline, if present */
+	if( buffer[strlen(buffer)-1] == '\n')
+		buffer[strlen(buffer)-1] = '\0';
+	return strlen(buffer);
+}

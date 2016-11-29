@@ -1,0 +1,118 @@
+//============================================================================
+// Name        : ChessServer.cpp
+// Author      : Neculau Francisc
+// Version     : 1.0.0
+// Copyright   : Your copyright notice
+// Description : Hello World in C++, Ansi-style
+//============================================================================
+
+#include <iostream>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/time.h>
+#include <netinet/in.h>
+#include <unistd.h>
+#include <errno.h>
+#include <stdio.h>
+#include <arpa/inet.h>
+#include <string.h>
+#include <cstdlib>
+#include <pthread.h>
+
+using namespace std;
+
+static const int PORT = 2728;
+static const int SERVER_SIZE = 5;
+
+void * treatClient(void *);
+
+struct ClientInformationStructure {
+	struct sockaddr_in clientSocketAddress;
+	int clientSocketDescriptor;
+};
+
+
+int main() {
+	/*
+	 * 	Declaram o structura pentru client ce va incapsula informatii
+	 * ce trebuie transmise thread-ului
+	 */
+	ClientInformationStructure client;
+	/*
+	 * Declaram vectorul ce tine evidenta tuturor thread-urilor
+	 */
+	pthread_t threadIdentifierList;//[SERVER_SIZE];
+	/*
+	 * Declaram structura @clientSocketAddress
+	 */
+	struct sockaddr_in clientSocketAddress;
+	int clientSocketAddressSize;
+	int clientSocketDescriptor;
+	/*
+	 * Setam socketul @serverSocketDescriptor
+	 */
+	int serverSocketDescriptor;
+	int optval = 1;
+	if((serverSocketDescriptor = socket(AF_INET, SOCK_STREAM, 0)) == -1)
+		cout<<"erorare";
+	setsockopt(serverSocketDescriptor, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
+	/*
+	 * Setam structura @serverSocketAddress
+	 */
+	struct sockaddr_in serverSocketAddress;
+	bzero(&serverSocketAddress, sizeof(serverSocketAddress));
+	serverSocketAddress.sin_family      = AF_INET;
+	serverSocketAddress.sin_addr.s_addr = htonl(INADDR_ANY);
+	serverSocketAddress.sin_port        = htons(PORT);
+	/*
+	 * Atasam socketului @serverSocketDescriptor adresa @serverSocketAddress
+	 */
+	if(bind(serverSocketDescriptor, (struct sockaddr *)&serverSocketAddress, sizeof(struct sockaddr)) == -1)
+		cout<<"eroare";
+	/*
+	 * Setam socketulu @serverSocketDescriptor ca socket pasiv ce asteapta conexiuni ( maxim 5 )
+	 */
+	if(listen(serverSocketDescriptor, SERVER_SIZE) == -1)
+		cout<<"eroare";
+
+	/*
+	 * Tratam clientii
+	 */
+	while(1) {
+		/*
+		 * Acceptam clientii initializand @clientSocketDescriptor si @clientSocketAddressSize
+		 * ( apelul accept e blocant )s
+		 */
+		clientSocketAddressSize = sizeof(clientSocketAddress);
+		bzero(&clientSocketAddress, sizeof(clientSocketAddress));
+		clientSocketDescriptor = accept(serverSocketDescriptor,
+				(struct sockaddr *) &clientSocketAddress, (unsigned int *) &clientSocketAddressSize);
+		if(clientSocketDescriptor < 0)
+			cout<<"eroare";
+		/*
+		 * Lansam un nou thread care sa trateze clientul
+		 * ( thread-ul inchide automat pe sine si descr
+		 */
+		client.clientSocketAddress = clientSocketAddress;
+		client.clientSocketDescriptor = clientSocketDescriptor;
+		pthread_create(&threadIdentifierList, NULL, treatClient, (void * ) &client);
+
+	}
+
+	return 0;
+}
+
+void * treatClient(void * clientInformationStructure) {
+	ClientInformationStructure * client = (ClientInformationStructure *)(clientInformationStructure);
+	cout<<"socketDescriptorul-ul clientului : " << client->clientSocketDescriptor << endl;
+
+	char message[256];
+	if(recv(client->clientSocketDescriptor, &message, sizeof(message), 0) < 0)
+		cout <<"error";
+
+	cout << endl << "client : " << client->clientSocketDescriptor << "mesaj : " << message << endl;
+
+	close((long)clientInformationStructure);
+	pthread_exit(NULL);
+
+}
